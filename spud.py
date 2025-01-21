@@ -75,15 +75,18 @@ def plot1DHistogram(
     canvas.Close()
 
 def plot2DHistogram(
-    hist, outputDir, title=None, xLabel=None, yLabel=None, filename=None
+        hist, outputDir, title=None, xLabel=None, yLabel=None, zLabel=None, filename=None
 ):
     canvas = ROOT.TCanvas("c2", "Canvas for 2D Histogram", 800, 600)
+    canvas.SetRightMargin(.14);
     if title:
         hist.SetTitle(f'Run {runNumber}: {title}')
     if xLabel:
         hist.GetXaxis().SetTitle(xLabel)
     if yLabel:
         hist.GetYaxis().SetTitle(yLabel)
+    if zLabel:
+        hist.GetZaxis().SetTitle(zLabel)
 
     hist.SetStats(0)
     hist.Draw("COLZ")
@@ -104,10 +107,11 @@ def configuredPlot(obj, outputDir):
     title = options.get("title", histName)
     xLabel = options.get("x_label", None)
     yLabel = options.get("y_label", None)
+    zLabel = options.get("z_label", None)
     if obj.InheritsFrom("TH1"):
         if obj.InheritsFrom("TH2"):
             plot2DHistogram(
-                obj, outputDir, title=title, xLabel=xLabel, yLabel=yLabel
+                obj, outputDir, title=title, xLabel=xLabel, yLabel=yLabel, zLabel=zLabel
             )
         else:
             plot1DHistogram(
@@ -162,7 +166,7 @@ def runAllHists(baseDirectory, outputBaseDir):
     print("Done!")
 
 histConfig = {
-    "SCurve_Chip": {"x_label": "Channel Number", "y_label": "Threshold"},
+    "SCurve_Chip": {"x_label": "Channel Number", "y_label": "Threshold", "z_label": "Occupancy"},
     # "histogram_name_pattern": {"title": "Histogram 1", "x_label": "X-Axis", "y_label": "Y-Axis"},
 }
 
