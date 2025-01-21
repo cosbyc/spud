@@ -3,7 +3,7 @@ import os
 
 import ROOT
 
-# ROOT.gErrorIgnoreLevel = ROOT.kError
+ROOT.gErrorIgnoreLevel = ROOT.kError
 parser = argparse.ArgumentParser()
 parser.add_argument("-r", "--run", type=int, required=True, help="Run number")
 parser.add_argument(
@@ -60,7 +60,7 @@ def plot1DHistogram(
 ):
     canvas = ROOT.TCanvas("c1", "Canvas for 1D Histogram", 800, 600)
     if title:
-        hist.SetTitle(title)
+        hist.SetTitle(f'Run {runNumber}: {title}')
     if xLabel:
         hist.GetXaxis().SetTitle(xLabel)
     if yLabel:
@@ -79,7 +79,7 @@ def plot2DHistogram(
 ):
     canvas = ROOT.TCanvas("c2", "Canvas for 2D Histogram", 800, 600)
     if title:
-        hist.SetTitle(title)
+        hist.SetTitle(f'Run {runNumber}: {title}')
     if xLabel:
         hist.GetXaxis().SetTitle(xLabel)
     if yLabel:
