@@ -1,8 +1,9 @@
 import argparse
 import os
-
 import ROOT
 
+
+ROOT.gROOT.SetBatch(True)
 ROOT.gErrorIgnoreLevel = ROOT.kError
 parser = argparse.ArgumentParser()
 parser.add_argument("-r", "--run", type=int, required=True, help="Run number")
