@@ -1,26 +1,26 @@
 import argparse
 import os
 import ROOT
-
+import csv
+import pandas as pd
+from datetime import date
 
 ROOT.gROOT.SetBatch(True)
 ROOT.gErrorIgnoreLevel = ROOT.kError
 parser = argparse.ArgumentParser()
 parser.add_argument("-r", "--run", type=int, required=True, help="Run number")
-parser.add_argument(
-    "-f", "--fast", action="store_true", help="Make only configured plots"
-)
-parser.add_argument(
-    "-s",
-    "--skip",
-    action="store_true",
-    help="Skip full 'plot loop' run only other functions",
-)
+parser.add_argument("--noiseFreq", type=int, required=False, default =0, help="Frequency column value")
+parser.add_argument("--csv", type=str, required=False, default="hist_means.csv", help="CSV file to save results.")
+parser.add_argument("-f", "--fast", action="store_true", help="Make only configured plots; do not use --skip with this option")
+parser.add_argument("-s", "--skip", action="store_true", default=False, help="Skip full 'plot loop' run only other functions",)
 args = parser.parse_args()
 
 runNumber = args.run
 fast = args.fast
 skip = args.skip
+csvName = args.csv
+noiseFreq = args.noiseFreq
+
 
 def main():
     inputFileName = f"Results/Run_{runNumber}/Results.root"
@@ -40,13 +40,60 @@ def main():
         return
     os.makedirs(outputBaseDir, exist_ok=True)
 
-    # Make generic plots of all histograms
-    if skip is not True:
-        runAllHists(baseDirectory, outputBaseDir)
-
-    # Add other plotting functions...
-
+    # Loop through all subdirectories; plotting functions called from within looper
+    mainLooper(baseDirectory, outputBaseDir)
+    
     rootFile.Close()
+
+def mainLooper(baseDirectory, outputBaseDir):
+    allMods = []
+    allHybrids = [] # store list of all hybrids and modules to avoid relooping
+
+    # Loop over modules
+    modules = getSubdirectories(baseDirectory, "OpticalGroup_")
+    for module in modules:
+        allMods.append(module)
+        moduleOutputDir = os.path.join(outputBaseDir, module.GetName())
+        os.makedirs(moduleOutputDir, exist_ok=True)
+        # Plot module level hists
+        for key in module.GetListOfKeys():
+            if skip != True:
+                configuredPlot(key.ReadObj(), moduleOutputDir)
+        ### Func: Produce pixel noise heatmap for both hrbyids on a given module
+        drawModuleNoiseMap(module, moduleOutputDir)
+        
+        # Loop over hybrids
+        hybrids = getSubdirectories(module, "Hybrid_")
+        for hybrid in hybrids:
+            allHybrids.append(hybrid)
+            hybridOutputDir = os.path.join(moduleOutputDir, hybrid.GetName())
+            os.makedirs(hybridOutputDir, exist_ok=True)
+            # Plot hybrid level hists
+            for key in hybrid.GetListOfKeys():
+                if skip != True:
+                    configuredPlot(key.ReadObj(), hybridOutputDir)
+
+            # Loop over strips
+            strips = getSubdirectories(hybrid, "SSA_")
+            for strip in strips:
+                stripOutputDir = os.path.join(hybridOutputDir, strip.GetName())
+                os.makedirs(stripOutputDir, exist_ok=True)
+                # Plot strip level hists
+                for key in strip.GetListOfKeys():
+                    if skip != True:
+                        configuredPlot(key.ReadObj(), stripOutputDir)
+            # Loop over pixels
+            pixels = getSubdirectories(hybrid, "MPA_")
+            for pixel in pixels:
+                pixelOutputDir = os.path.join(hybridOutputDir, pixel.GetName())
+                os.makedirs(pixelOutputDir, exist_ok=True)
+                # Plot pixel level hists
+                for key in pixel.GetListOfKeys():
+                    if skip != True:
+                        configuredPlot(key.ReadObj(), pixelOutputDir)
+
+    exportHybridNoise(allHybrids, "HybridNoise", "noiseData.csv", noiseFreq)
+    print("Done!")
 
 def getSubdirectories(directory, pattern):
     matchedDirs = []
@@ -119,62 +166,7 @@ def configuredPlot(obj, outputDir):
                 obj, outputDir, title=title, xLabel=xLabel, yLabel=yLabel
             )
 
-def runAllHists(baseDirectory, outputBaseDir):
-    print("Making all plots...")
-    # Loop over modules
-    modules = getSubdirectories(baseDirectory, "OpticalGroup_")
-    for module in modules:
-
-        moduleOutputDir = os.path.join(outputBaseDir, module.GetName())
-        os.makedirs(moduleOutputDir, exist_ok=True)
-
-        # Plot module level hists
-        for key in module.GetListOfKeys():
-            configuredPlot(key.ReadObj(), moduleOutputDir)
-        drawModuleNoiseMap(module, moduleOutputDir)
-        
-        # Loop over hybrids
-        hybrids = getSubdirectories(module, "Hybrid_")
-        for hybrid in hybrids:
-
-            hybridOutputDir = os.path.join(moduleOutputDir, hybrid.GetName())
-            os.makedirs(hybridOutputDir, exist_ok=True)
-
-            # Plot hybrid level hists
-            for key in hybrid.GetListOfKeys():
-                configuredPlot(key.ReadObj(), hybridOutputDir)
-
-            # Loop over strips
-            strips = getSubdirectories(hybrid, "SSA_")
-            for strip in strips:
-
-                stripOutputDir = os.path.join(hybridOutputDir, strip.GetName())
-                os.makedirs(stripOutputDir, exist_ok=True)
-
-                # Plot strip level hists
-                for key in strip.GetListOfKeys():
-                    configuredPlot(key.ReadObj(), stripOutputDir)
-
-            # Loop over pixels
-            pixels = getSubdirectories(hybrid, "MPA_")
-            for pixel in pixels:
-
-                pixelOutputDir = os.path.join(hybridOutputDir, pixel.GetName())
-                os.makedirs(pixelOutputDir, exist_ok=True)
-
-                # Plot pixel level hists
-                for key in pixel.GetListOfKeys():
-                    configuredPlot(key.ReadObj(), pixelOutputDir)
-    print("Done!")
 def drawModuleNoiseMap(module, outputDir):
-    """
-    Collects and arranges all 2DPixelNoise histograms from a module onto a single TCanvas.
-
-    Args:
-        module (TDirectory): The ROOT directory corresponding to an OpticalGroup (module).
-        outputDir (str): Directory to save the final compiled plot.
-    """
-
     numHybrids = 2  # Two hybrids per module (rows)
     numMPAs = 8  # Eight MPAs per hybrid (columns)
     histWidth, histHeight = 300, 600  # Per histogram
@@ -303,6 +295,63 @@ def drawModuleNoiseMap(module, outputDir):
     canvas.Update()
     canvas.SaveAs(os.path.join(outputDir, "Module_NoiseMap.png"))
     canvas.Close()
+
+import os
+import pandas as pd
+from datetime import date
+
+def exportHybridNoise(hybridList, histName, csvFile, freq):
+    means = [runNumber, date.today().strftime("%m/%d/%Y"), "WARM", "Sine", freq, 1.2, 11.5]
+    
+    print(f"Extracting means for histogram: {histName}")
+    hybridNumbers = []
+    hybridData = {}
+    
+    for hybridIndex, hybrid in enumerate(hybridList):
+        hybridNum = hybrid.GetName()[7:]
+        #if hybridNum == '1': continue
+        hybridNumbers.append(hybridNum)
+        
+        print(f"Processing Hybrid {hybridNum}")
+        histMean = None
+        for key in hybrid.GetListOfKeys():
+            hist = key.ReadObj()
+            if hist.InheritsFrom("TH1F") and histName in hist.GetName():
+                histMean = hist.GetMean()
+                print(f"  -> Found {hist.GetName()}, Mean: {histMean:.3f}")
+                break
+        if histMean is None:
+            histMean = ""
+        
+        hybridData[hybridNum] = f'{histMean:.3f}'
+    
+    # Load existing data
+    if os.path.isfile(csvFile):
+        df = pd.read_csv(csvFile, dtype=str)  # Ensure everything is read as string to prevent type mismatches
+    else:
+        df = pd.DataFrame(columns=["RunNumber", "Date", "Temperature", "Noise Form", "Frequency", "Amplitude", "LV Power"])
+    
+    # Ensure hybrid columns exist and are correctly ordered
+    for hybridNum in hybridNumbers:
+        if hybridNum not in df.columns:
+            df.insert(len(df.columns),hybridNum, "")
+    
+    # Prepare new row
+    new_row = {col: "" for col in df.columns}
+    for i, value in enumerate(means):
+        new_row[df.columns[i]] = value  # Assign meta-data columns correctly
+    for hybridNum, value in hybridData.items():
+        new_row[hybridNum] = value  # Assign hybrid noise values
+    
+    # Convert new row to DataFrame and concatenate
+    new_row_df = pd.DataFrame([new_row])
+    df = pd.concat([df, new_row_df], ignore_index=True)
+    
+    # Save to CSV
+    df.to_csv(csvFile, index=False)
+    
+    print(f"Data written to {csvFile}")
+
     
 histConfig = {
     "SCurve_Chip": {"x_label": "Channel Number", "y_label": "Threshold", "z_label": "Occupancy"},
