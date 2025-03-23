@@ -60,7 +60,7 @@ def mainLooper(baseDirectory, outputBaseDir):
             if skip != True:
                 configuredPlot(key.ReadObj(), moduleOutputDir)
         ### Func: Produce pixel noise heatmap for both hrbyids on a given module
-        drawModuleNoiseMap(module, moduleOutputDir)
+        #drawModuleNoiseMap(module, moduleOutputDir)
         
         # Loop over hybrids
         hybrids = getSubdirectories(module, "Hybrid_")
@@ -296,10 +296,6 @@ def drawModuleNoiseMap(module, outputDir):
     canvas.SaveAs(os.path.join(outputDir, "Module_NoiseMap.png"))
     canvas.Close()
 
-import os
-import pandas as pd
-from datetime import date
-
 def exportHybridNoise(hybridList, histName, csvFile, freq):
     means = [runNumber, date.today().strftime("%m/%d/%Y"), "WARM", "Sine", freq, 1.2, 11.5]
     
@@ -309,7 +305,7 @@ def exportHybridNoise(hybridList, histName, csvFile, freq):
     
     for hybridIndex, hybrid in enumerate(hybridList):
         hybridNum = hybrid.GetName()[7:]
-        #if hybridNum == '1': continue
+        if hybridNum == '2': continue
         hybridNumbers.append(hybridNum)
         
         print(f"Processing Hybrid {hybridNum}")
@@ -333,20 +329,25 @@ def exportHybridNoise(hybridList, histName, csvFile, freq):
     
     # Ensure hybrid columns exist and are correctly ordered
     for hybridNum in hybridNumbers:
-        if hybridNum not in df.columns:
-            df.insert(len(df.columns),hybridNum, "")
+        if f'Hybrid {hybridNum}' not in df.columns:
+            df.insert(len(df.columns),f'Hybrid {hybridNum}', "")
     
     # Prepare new row
     new_row = {col: "" for col in df.columns}
     for i, value in enumerate(means):
         new_row[df.columns[i]] = value  # Assign meta-data columns correctly
     for hybridNum, value in hybridData.items():
-        new_row[hybridNum] = value  # Assign hybrid noise values
+        new_row[f'Hybrid {hybridNum}'] = value  # Assign hybrid noise values
     
     # Convert new row to DataFrame and concatenate
     new_row_df = pd.DataFrame([new_row])
     df = pd.concat([df, new_row_df], ignore_index=True)
     
+    # Reorder the columns: meta-data columns should be first, followed by hybrid columns in numerical order
+    hybridColumns = sorted([col for col in df.columns if col.startswith('Hybrid')], key=lambda x: int(x.split()[1]))
+    ordered_columns = list(df.columns[:7]) + hybridColumns
+    df = df[ordered_columns]  # Reorder DataFrame    
+
     # Save to CSV
     df.to_csv(csvFile, index=False)
     
