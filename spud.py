@@ -308,47 +308,42 @@ def exportHybridNoise(hybridList, histName, csvFile, freq):
         if hybridNum == '2': continue
         hybridNumbers.append(hybridNum)
         
-        print(f"Processing Hybrid {hybridNum}")
         histMean = None
         for key in hybrid.GetListOfKeys():
             hist = key.ReadObj()
             if hist.InheritsFrom("TH1F") and histName in hist.GetName():
                 histMean = hist.GetMean()
-                print(f"  -> Found {hist.GetName()}, Mean: {histMean:.3f}")
+                print(f"{hist.GetName()}, Mean: {histMean:.3f}")
                 break
         if histMean is None:
             histMean = ""
         
         hybridData[hybridNum] = f'{histMean:.3f}'
     
-    # Load existing data
     if os.path.isfile(csvFile):
-        df = pd.read_csv(csvFile, dtype=str)  # Ensure everything is read as string to prevent type mismatches
+        df = pd.read_csv(csvFile, dtype=str)
     else:
         df = pd.DataFrame(columns=["RunNumber", "Date", "Temperature", "Noise Form", "Frequency", "Amplitude", "LV Power"])
     
-    # Ensure hybrid columns exist and are correctly ordered
     for hybridNum in hybridNumbers:
         if f'Hybrid {hybridNum}' not in df.columns:
             df.insert(len(df.columns),f'Hybrid {hybridNum}', "")
     
-    # Prepare new row
-    new_row = {col: "" for col in df.columns}
+    # stage new row
+    newRow = {col: "" for col in df.columns}
     for i, value in enumerate(means):
-        new_row[df.columns[i]] = value  # Assign meta-data columns correctly
+        newRow[df.columns[i]] = value  
     for hybridNum, value in hybridData.items():
-        new_row[f'Hybrid {hybridNum}'] = value  # Assign hybrid noise values
+        newRow[f'Hybrid {hybridNum}'] = value 
     
-    # Convert new row to DataFrame and concatenate
-    new_row_df = pd.DataFrame([new_row])
-    df = pd.concat([df, new_row_df], ignore_index=True)
-    
-    # Reorder the columns: meta-data columns should be first, followed by hybrid columns in numerical order
-    hybridColumns = sorted([col for col in df.columns if col.startswith('Hybrid')], key=lambda x: int(x.split()[1]))
-    ordered_columns = list(df.columns[:7]) + hybridColumns
-    df = df[ordered_columns]  # Reorder DataFrame    
+    newRow_df = pd.DataFrame([newRow])
+    df = pd.concat([df, newRow_df], ignore_index=True)
 
-    # Save to CSV
+    # sort
+    hybridColumns = sorted([col for col in df.columns if col.startswith('Hybrid')], key=lambda x: int(x.split()[1]))
+    orderedColumns = list(df.columns[:7]) + hybridColumns
+    df = df[orderedColumns]
+    
     df.to_csv(csvFile, index=False)
     
     print(f"Data written to {csvFile}")
