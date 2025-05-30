@@ -60,7 +60,7 @@ def mainLooper(baseDirectory, outputBaseDir):
             if skip != True:
                 configuredPlot(key.ReadObj(), moduleOutputDir)
         ### Func: Produce pixel noise heatmap for both hrbyids on a given module
-        #drawModuleNoiseMap(module, moduleOutputDir)
+        drawModuleNoiseMap(module, moduleOutputDir)
         
         # Loop over hybrids
         hybrids = getSubdirectories(module, "Hybrid_")
@@ -92,7 +92,7 @@ def mainLooper(baseDirectory, outputBaseDir):
                     if skip != True:
                         configuredPlot(key.ReadObj(), pixelOutputDir)
 
-    exportHybridNoise(allHybrids, "HybridNoise", "noiseData.csv", noiseFreq)
+    #exportHybridNoise(allHybrids, "HybridNoise", "noiseData.csv", noiseFreq)
     print("Done!")
 
 def getSubdirectories(directory, pattern):
@@ -167,7 +167,7 @@ def configuredPlot(obj, outputDir):
             )
 
 def drawModuleNoiseMap(module, outputDir):
-    numHybrids = 2  # Two hybrids per module (rows)
+    numHybrids = 1  # Two hybrids per module (rows)
     numMPAs = 8  # Eight MPAs per hybrid (columns)
     histWidth, histHeight = 300, 600  # Per histogram
 
@@ -204,7 +204,7 @@ def drawModuleNoiseMap(module, outputDir):
             # Find the 2DPixelNoise histogram
             for key in mpa.GetListOfKeys():
                 hist = key.ReadObj()
-                if hist.InheritsFrom("TH2") and "2DPixelNoise" in hist.GetName():
+                if hist.InheritsFrom("TH2") and "2DChannelNoise" in hist.GetName():
                     print(f"    -> Found 2DPixelNoise: {hist.GetName()}")
 
                     histMin = hist.GetMinimum()
@@ -221,7 +221,7 @@ def drawModuleNoiseMap(module, outputDir):
     # If no histograms were found, exit
     if all(all(cell is None for cell in row) for row in noiseMaps):
         print("No 2DPixelNoise histograms found!")
-        return
+        #return
 
     print(f"Global Min: {minVal}, Global Max: {maxVal}")
 
@@ -318,7 +318,7 @@ def exportHybridNoise(hybridList, histName, csvFile, freq):
         if histMean is None:
             histMean = ""
         
-        hybridData[hybridNum] = f'{histMean:.3f}'
+        hybridData[hybridNum] = f"{histMean:.3f}"
     
     if os.path.isfile(csvFile):
         df = pd.read_csv(csvFile, dtype=str)
